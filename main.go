@@ -100,7 +100,7 @@ func main() {
 	flag.StringVar(&scFilename, "shellcode", "shellcode.bin", "Shellcode file to embed inside the MSBuild payload.")
 	flag.StringVar(&codeFilename, "code", "payload.cs", "C# source code filename that the MSBuild payload should execute.")
 	flag.StringVar(&outFilename, "outfile", "", "Output filename for the MSBuild project or encrypted shellcode.")
-	flag.IntVar(&iterations, "rounds", 57285, "The number of iterations the loader will need to perform to reach the correct decryption key.")
+	flag.IntVar(&iterations, "rounds", -1, "The number of iterations the loader will need to perform to reach the correct decryption key. Default is a random value between 20000 and 30000.")
 	flag.StringVar(&domainKey, "key", "", "Key to Domain: the payload will only execute on a specific domain. Must be the FQDN.")
 	flag.BoolVar(&encryptOnly, "encryptOnly", false, "Output only the encrypted shellcode for another tool/project.")
 	flag.BoolVar(&obfuscate, "obfuscate", false, "[NOT IMPLEMENTED] Obfuscate the c# code using RosFuscator.")
@@ -115,6 +115,10 @@ func main() {
 		fmt.Printf("[!] Cannot find C# code file \"%s\"\n", codeFilename)
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+
+	if iterations < 0 {
+		iterations = 20000 + rand.Intn(10000)
 	}
 
 	// the MSBuild template code will have access to {{.Payload}}, {{.Key}} and {{.Hash}}
