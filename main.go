@@ -16,14 +16,7 @@ import (
 	"regexp"
 )
 
-var version = "1.6"
-
-// basic2.cs = VirtualAlloc + CreateThread
-// notsobasic.cs = NtCreateSection + NtMapViewOfSection + delegate
-// complex.cs = NtCreateSection + NtMapViewOfSection + APC on a suspended threat at ntdll!RtlExitUserThread
-
-//TODO obfiscation - https://github.com/Flangvik/RosFuscator
-//TODO use Dinvoke to be more stealthy - https://rastamouse.me/blog/process-injection-dinvoke/
+var version = "1.7"
 
 type MSBuildPayload struct {
 	Payload   string
@@ -84,6 +77,10 @@ func subtractFromByteArray(key []byte, value int) {
 			}
 		}
 	}
+}
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 }
 
 func main() {
@@ -153,7 +150,6 @@ func main() {
 
 	// generate encryption keys
 	fmt.Printf("[+] Generating encryption keys... ")
-	rand.Seed(time.Now().UTC().UnixNano())
 	key := make([]byte, 32)
 	rand.Read(key)
 	shellcodeHash := sha256.Sum256(shellcode)
